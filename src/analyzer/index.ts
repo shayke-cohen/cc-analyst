@@ -104,18 +104,23 @@ function computeStats(projects: ExtractedProject[]): UsageStats {
   };
 }
 
-export async function analyzePerProject(project: ExtractedProject, opts: AnalyzeOptions): Promise<ProjectAnalysis> {
+export async function analyzePerProject(project: ExtractedProject, opts: AnalyzeOptions, label = ""): Promise<ProjectAnalysis> {
   const sessionData = prepareSessionData(project);
   const projectName = project.project.name;
   const source = project.project.source;
+  const log = (phase: string, ms: number, extra = "") =>
+    console.error(`  ${label}${projectName} · ${phase}${extra ? " " + extra : ""}  (${(ms / 1000).toFixed(1)}s)`);
 
   let patterns: any = { patterns: [], sessionSummaries: [] };
   if (shouldRun(opts, "patterns")) {
+    const t = Date.now();
     patterns = await runJson(opts.engine, patternsPrompt(sessionData, projectName, source), opts.model);
+    log("patterns", Date.now() - t, `→ ${(patterns.patterns ?? []).length} patterns`);
   }
 
   let instructionsPatch: InstructionsPatch | null = null;
   if (shouldRun(opts, "instructions")) {
+    const t = Date.now();
     const target = instructionsTargetForApply(project.project);
     const currentFile = project.instructionsFiles.find((f) => f.kind === target.kind && f.exists);
     instructionsPatch = await runJson<InstructionsPatch>(
@@ -133,10 +138,14 @@ export async function analyzePerProject(project: ExtractedProject, opts: Analyze
     instructionsPatch.targetFile = target.path;
     instructionsPatch.fileKind = target.kind;
     instructionsPatch.currentContent = currentFile?.content ?? null;
+    const a = (instructionsPatch.additions ?? []).length;
+    const m = (instructionsPatch.modifications ?? []).length;
+    log("instructions", Date.now() - t, `→ +${a} ~${m}`);
   }
 
   let skills: SkillRecommendation[] = [];
   if (shouldRun(opts, "skills") && source === "claude-code") {
+    const t = Date.now();
     const result = await runJson<{ skills: SkillRecommendation[] }>(
       opts.engine,
       skillsPrompt(
@@ -149,6 +158,7 @@ export async function analyzePerProject(project: ExtractedProject, opts: Analyze
       opts.model,
     );
     skills = (result.skills ?? []).map((s) => normalizeSkill(s, project.project));
+    log("skills", Date.now() - t, `→ ${skills.length} skills`);
   }
 
   return { project: project.project, source, patterns, instructionsPatch, skills };
@@ -156,13 +166,15 @@ export async function analyzePerProject(project: ExtractedProject, opts: Analyze
 
 export async function analyze(projects: ExtractedProject[], opts: AnalyzeOptions): Promise<AnalysisOutput> {
   const perProject: ProjectAnalysis[] = [];
-  for (const p of projects) {
-    perProject.push(await analyzePerProject(p, opts));
+  for (let i = 0; i < projects.length; i++) {
+    const label = `[${i + 1}/${projects.length}] `;
+    perProject.push(await analyzePerProject(projects[i], opts, label));
   }
 
   const stats = computeStats(projects);
   let feedback: FeedbackReport | undefined;
   if (shouldRun(opts, "feedback")) {
+    const t = Date.now();
     const allPatterns = perProject.flatMap((r) => r.patterns?.patterns ?? []);
     feedback = await runJson<FeedbackReport>(
       opts.engine,
@@ -174,10 +186,12 @@ export async function analyze(projects: ExtractedProject[], opts: AnalyzeOptions
       ),
       opts.model,
     );
+    console.error(`  feedback (aggregate)  (${((Date.now() - t) / 1000).toFixed(1)}s)`);
   }
 
   let crossProject: any;
   if (projects.length >= 2) {
+    const t = Date.now();
     crossProject = await runJson(
       opts.engine,
       crossProjectPrompt(
@@ -186,6 +200,7 @@ export async function analyze(projects: ExtractedProject[], opts: AnalyzeOptions
       ),
       opts.model,
     );
+    console.error(`  cross-project  (${((Date.now() - t) / 1000).toFixed(1)}s)`);
   }
 
   const reports: AnalysisReport[] = perProject.map((r, i) => ({

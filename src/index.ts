@@ -109,12 +109,19 @@ program
       console.error(chalk.yellow(`Warning: --apply has nothing to do when --only ${opts.only} skips both the instructions and skills phases. Drop --only, or use --only instructions / --only skills.`));
     }
 
-    const result = extract({ source, days: opts.days, projectFilter: opts.project });
+    const filterTerms: string[] = opts.project ? String(opts.project).split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+    const result = extract({ source, days: opts.days });
     if (result.projects.length === 0) {
       console.error(chalk.yellow("No projects found matching filters."));
       process.exit(1);
     }
-    const projects = opts.all || !opts.project ? result.projects : result.projects.filter((p) => p.project.name.includes(opts.project));
+    const projects = opts.all || filterTerms.length === 0
+      ? result.projects
+      : result.projects.filter((p) => filterTerms.some((t) => p.project.name.includes(t) || p.project.decodedPath.includes(t)));
+    if (projects.length === 0) {
+      console.error(chalk.yellow(`No projects matched: ${filterTerms.join(", ")}`));
+      process.exit(1);
+    }
 
     console.log(chalk.gray(`Analyzing ${projects.length} project(s) with engine=${engineName}, ${projects.reduce((n, p) => n + p.sessions.length, 0)} sessions total.`));
 
