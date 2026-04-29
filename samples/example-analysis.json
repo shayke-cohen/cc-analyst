@@ -1,0 +1,54 @@
+{
+  "perProject": [
+    {
+      "project": {
+        "encodedDir": "-Users-example-code-api",
+        "decodedPath": "/Users/example/code/api",
+        "name": "api",
+        "source": "claude-code"
+      },
+      "source": "claude-code",
+      "patterns": {
+        "patterns": [
+          {
+            "category": "tool_preference",
+            "description": "User prefers vitest with describe/it and msw for HTTP mocking; pushes back on manual fetch stubs.",
+            "occurrences": 7,
+            "sessionIds": ["00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"],
+            "quotes": [
+              {"sessionId": "00000000-0000-0000-0000-000000000001", "text": "use msw for the http mocks please"},
+              {"sessionId": "00000000-0000-0000-0000-000000000002", "text": "no, don't stub fetch directly"}
+            ],
+            "suggestedRule": "When adding endpoints, always write a vitest spec under tests/ that uses msw for HTTP mocking.",
+            "suggestedSkill": null,
+            "scope": "project",
+            "confidence": "high"
+          }
+        ],
+        "sessionSummaries": [
+          {"sessionId": "00000000-0000-0000-0000-000000000001", "taskType": "feature", "outcome": "achieved"},
+          {"sessionId": "00000000-0000-0000-0000-000000000002", "taskType": "test", "outcome": "achieved"}
+        ]
+      },
+      "instructionsPatch": {
+        "targetFile": "/Users/example/code/api/CLAUDE.md",
+        "fileKind": "CLAUDE.md",
+        "currentContent": "## Tests\n- Run npm test before committing.\n",
+        "additions": [
+          {
+            "section": "## Tests",
+            "rule": "When adding endpoints, always write a vitest spec under tests/ that uses msw for HTTP mocking.",
+            "evidence": "7 sessions across 2 days, repeated correction toward msw",
+            "confidence": "high",
+            "scope": "project"
+          }
+        ],
+        "modifications": [],
+        "removals": [],
+        "noChangeNeeded": ["## Tests"]
+      },
+      "skills": []
+    }
+  ],
+  "reports": []
+}

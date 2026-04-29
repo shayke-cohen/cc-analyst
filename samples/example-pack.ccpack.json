@@ -1,0 +1,59 @@
+{
+  "id": "11111111-2222-3333-4444-555555555555",
+  "version": "1.0.0",
+  "name": "ts-api-patterns",
+  "description": "Conventions and skills for TypeScript HTTP API development with vitest + msw.",
+  "author": "example",
+  "createdAt": "2026-04-15T00:00:00.000Z",
+  "tags": ["typescript", "api", "testing"],
+  "license": "MIT",
+  "rules": [
+    {
+      "id": "r-001",
+      "section": "## Tests",
+      "rule": "When adding endpoints, always write a vitest spec under tests/ that uses msw for HTTP mocking.",
+      "rationale": "Detected across 7 sessions where the user explicitly redirected toward msw and away from manual fetch stubs.",
+      "confidence": "high",
+      "tags": ["testing", "msw"],
+      "fileKind": "either"
+    },
+    {
+      "id": "r-002",
+      "section": "## Style",
+      "rule": "When fixing errors, identify the error type before adding handlers; do not wrap unrelated code in try/catch.",
+      "rationale": "User corrected over-broad try/catch in 5 sessions.",
+      "confidence": "high",
+      "tags": ["errors"],
+      "fileKind": "either"
+    },
+    {
+      "id": "r-003",
+      "section": "## Workflow",
+      "rule": "Before suggesting a refactor is done, run the typecheck script and report any new errors.",
+      "rationale": "Observed in 4 sessions across 2 projects.",
+      "confidence": "medium",
+      "tags": ["workflow"],
+      "fileKind": "either"
+    }
+  ],
+  "skills": [
+    {
+      "filename": "api-endpoint-scaffold.md",
+      "title": "Scaffold a new HTTP endpoint",
+      "description": "Five-step workflow to add a typed HTTP endpoint with handler, route registration, schema, and test.",
+      "content": "---\nname: api-endpoint-scaffold\ndescription: Add a typed HTTP endpoint with handler, schema, route, and test.\n---\n\n## When to use\n\nThe user asks to add a new endpoint, route, or HTTP handler.\n\n## Steps\n\n1. Locate the route registration file.\n2. Add the handler function with typed request/response.\n3. Add the zod schema for the request body.\n4. Register the route.\n5. Add a vitest spec using msw.\n",
+      "tags": ["scaffolding", "api"]
+    }
+  ],
+  "provenance": {
+    "derivedFromSessions": 18,
+    "derivedFromProjects": 2,
+    "toolVersion": "0.1.0",
+    "confidenceDistribution": { "high": 2, "medium": 1, "low": 0 },
+    "sources": ["claude-code"]
+  },
+  "compatibility": {
+    "targetStack": ["typescript", "node", "fastify-or-express"],
+    "claudeCodeMinVersion": "2.0.0"
+  }
+}

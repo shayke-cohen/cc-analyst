@@ -1,0 +1,6 @@
+{"timestamp":"2026-04-02T09:00:00.000Z","type":"session_meta","payload":{"id":"019d0000-0000-7000-0000-000000000001","timestamp":"2026-04-02T09:00:00.000Z","cwd":"/Users/example/code/api","cli_version":"0.125.0","source":"vscode","model_provider":"openai","originator":"Codex CLI"}}
+{"timestamp":"2026-04-02T09:00:05.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Add a /health endpoint."}]}}
+{"timestamp":"2026-04-02T09:00:10.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"rg 'app.get' src\"}","call_id":"call-1"}}
+{"timestamp":"2026-04-02T09:00:11.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"src/server.ts:12: app.get('/users', ...)\n"}}
+{"timestamp":"2026-04-02T09:00:15.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Adding /health endpoint to src/server.ts."}]}}
+{"timestamp":"2026-04-02T09:00:18.000Z","type":"response_item","payload":{"type":"function_call","name":"apply_patch","arguments":"{\"file_path\":\"src/server.ts\",\"diff\":\"+ app.get('/health', ...)\"}","call_id":"call-2"}}
