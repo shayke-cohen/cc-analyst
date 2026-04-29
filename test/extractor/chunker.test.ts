@@ -40,16 +40,16 @@ function makeProject(count: number): ExtractedProject {
 }
 
 describe("chunker", () => {
-  it("picks full strategy under 20", () => {
+  it("picks full strategy under 9", () => {
     expect(pickStrategy(5)).toBe("full");
-    expect(pickStrategy(20)).toBe("full");
+    expect(pickStrategy(8)).toBe("full");
   });
-  it("picks hybrid 21-50", () => {
-    expect(pickStrategy(21)).toBe("hybrid");
-    expect(pickStrategy(50)).toBe("hybrid");
+  it("picks hybrid 9-30", () => {
+    expect(pickStrategy(9)).toBe("hybrid");
+    expect(pickStrategy(30)).toBe("hybrid");
   });
-  it("picks summary 51+", () => {
-    expect(pickStrategy(51)).toBe("summary");
+  it("picks summary 31+", () => {
+    expect(pickStrategy(31)).toBe("summary");
     expect(pickStrategy(500)).toBe("summary");
   });
   it("full keeps message text", () => {
@@ -57,7 +57,7 @@ describe("chunker", () => {
     expect(json).toContain("hello world");
   });
   it("hybrid trims assistant snippets to ~200 chars", () => {
-    const json = prepareSessionData(makeProject(30));
+    const json = prepareSessionData(makeProject(20));
     expect(json).toContain("hello world");
     const parsed = JSON.parse(json);
     expect(parsed[0].assistantSnippets[0].length).toBeLessThanOrEqual(200);

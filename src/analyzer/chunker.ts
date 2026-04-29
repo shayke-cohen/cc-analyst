@@ -3,9 +3,16 @@ import type { ExtractedProject, ExtractedSession } from "../types.js";
 export type ChunkStrategy = "full" | "hybrid" | "summary";
 
 export function pickStrategy(count: number): ChunkStrategy {
-  if (count <= 20) return "full";
-  if (count <= 50) return "hybrid";
+  if (count <= 8) return "full";
+  if (count <= 30) return "hybrid";
   return "summary";
+}
+
+const MAX_MSG_TEXT = 2000;
+
+function truncText(s: string | undefined): string | undefined {
+  if (!s) return s;
+  return s.length > MAX_MSG_TEXT ? s.slice(0, MAX_MSG_TEXT) + "…[truncated]" : s;
 }
 
 function truncateToolOutputs(s: ExtractedSession) {
@@ -24,7 +31,7 @@ function truncateToolOutputs(s: ExtractedSession) {
     messages: s.messages.map((m) => ({
       role: m.role,
       timestamp: m.timestamp,
-      text: m.text,
+      text: truncText(m.text),
       toolCalls: m.toolCalls?.map((tc) => ({ tool: tc.tool, inputKeys: tc.input && typeof tc.input === "object" ? Object.keys(tc.input) : [] })),
     })),
   };
@@ -41,7 +48,7 @@ function hybridSummary(s: ExtractedSession) {
     toolStats: s.toolStats,
     errorCount: s.errors.length,
     filesModified: s.filesModified,
-    userMessages: s.messages.filter((m) => m.role === "user" && m.text).map((m) => ({ timestamp: m.timestamp, text: m.text })),
+    userMessages: s.messages.filter((m) => m.role === "user" && m.text).map((m) => ({ timestamp: m.timestamp, text: truncText(m.text) })),
     assistantSnippets: s.messages.filter((m) => m.role === "assistant" && m.text).map((m) => m.text!.slice(0, 200)),
   };
 }
