@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findSectionIndex, parseMarkdown, renderMarkdown } from "../../src/apply/parser.js";
+import { ensureTrailingNewline, findSectionIndex, parseMarkdown, renderMarkdown } from "../../src/apply/parser.js";
 
 describe("markdown parser", () => {
   it("parses preamble + sections", () => {
@@ -30,5 +30,26 @@ describe("markdown parser", () => {
 
   it("handles empty input", () => {
     expect(parseMarkdown("")).toEqual([]);
+  });
+
+  it("preserves blank line between heading and first paragraph (regression #2)", () => {
+    const md = "## Project Overview\n\nVoiceStream is a thing.\n\n## Next\nbody\n";
+    const sections = parseMarkdown(md);
+    const rendered = renderMarkdown(sections);
+    expect(rendered).toContain("## Project Overview\n\nVoiceStream is a thing.");
+    expect(rendered).toContain("## Next\nbody");
+  });
+
+  it("renderMarkdown roundtrips multi-section content byte-identical (modulo trailing newline)", () => {
+    const md = "preamble line\n\n## A\nbody A\n\n## B\nbody B\n";
+    const out = renderMarkdown(parseMarkdown(md));
+    expect(out.trimEnd()).toBe(md.trimEnd());
+  });
+
+  it("ensureTrailingNewline adds exactly one trailing newline (regression #4)", () => {
+    expect(ensureTrailingNewline("foo")).toBe("foo\n");
+    expect(ensureTrailingNewline("foo\n")).toBe("foo\n");
+    expect(ensureTrailingNewline("foo\n\n")).toBe("foo\n\n");
+    expect(ensureTrailingNewline("")).toBe("\n");
   });
 });

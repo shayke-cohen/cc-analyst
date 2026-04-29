@@ -7,6 +7,9 @@ import { prepareSessionData, summarizeAllSessions } from "./chunker.js";
 import {
   SYSTEM_PROMPT, crossProjectPrompt, feedbackPrompt, instructionsPrompt, patternsPrompt, skillsPrompt,
 } from "./prompts.js";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { CLAUDE_SKILLS_GLOBAL } from "../utils/paths.js";
 import { instructionsTargetForApply } from "../extractor/instructions.js";
 
 export interface AnalyzeOptions {
@@ -55,6 +58,15 @@ async function runJson<T>(engine: AnalysisEngine, prompt: string, model?: string
 
 function shouldRun(opts: AnalyzeOptions, phase: "patterns" | "instructions" | "skills" | "feedback") {
   return !opts.onlyPhases || opts.onlyPhases.includes(phase);
+}
+
+function normalizeSkill(s: SkillRecommendation, project: { decodedPath: string }): SkillRecommendation {
+  const filename = s.filename?.endsWith(".md") ? s.filename : `${s.filename ?? "skill"}.md`;
+  const scope = s.scope ?? "project";
+  const targetDir = s.targetDir ?? (scope === "global" ? CLAUDE_SKILLS_GLOBAL : join(project.decodedPath, ".claude", "skills"));
+  const targetPath = join(targetDir, filename);
+  const action = s.action ?? (existsSync(targetPath) ? "update" : "create");
+  return { ...s, action, filename, scope, targetDir };
 }
 
 function computeStats(projects: ExtractedProject[]): UsageStats {
@@ -136,7 +148,7 @@ export async function analyzePerProject(project: ExtractedProject, opts: Analyze
       ),
       opts.model,
     );
-    skills = result.skills ?? [];
+    skills = (result.skills ?? []).map((s) => normalizeSkill(s, project.project));
   }
 
   return { project: project.project, source, patterns, instructionsPatch, skills };

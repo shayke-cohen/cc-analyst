@@ -105,6 +105,10 @@ program
     const source = parseSource(opts.source);
     const engineName = parseEngine(opts.engine);
 
+    if (opts.apply && opts.only && opts.only !== "instructions" && opts.only !== "skills") {
+      console.error(chalk.yellow(`Warning: --apply has nothing to do when --only ${opts.only} skips both the instructions and skills phases. Drop --only, or use --only instructions / --only skills.`));
+    }
+
     const result = extract({ source, days: opts.days, projectFilter: opts.project });
     if (result.projects.length === 0) {
       console.error(chalk.yellow("No projects found matching filters."));
@@ -134,15 +138,20 @@ program
     }
 
     if (opts.apply) {
-      const applyResult = await apply(output, {
-        mode: opts.dryRun ? "dry-run" : opts.auto ? "auto" : "interactive",
-        autoApplyConfidence: "high",
-      });
-      console.log(chalk.bold("\n═══ Apply Summary ═══"));
-      console.log(`Applied: ${applyResult.applied.length} files (${applyResult.applied.reduce((n, a) => n + a.opsApplied, 0)} ops)`);
-      console.log(`Skipped: ${applyResult.skipped.length}`);
-      console.log(`Skills created: ${applyResult.skillsCreated.length}, updated: ${applyResult.skillsUpdated.length}`);
-      if (applyResult.backupId) console.log(`Backup: ${applyResult.backupId}`);
+      const hasPatches = output.perProject.some((p) => p.instructionsPatch || p.skills.length > 0);
+      if (!hasPatches) {
+        console.log(chalk.yellow("\nNo recommendations to apply (instructions and skills phases produced nothing)."));
+      } else {
+        const applyResult = await apply(output, {
+          mode: opts.dryRun ? "dry-run" : opts.auto ? "auto" : "interactive",
+          autoApplyConfidence: "high",
+        });
+        console.log(chalk.bold("\n═══ Apply Summary ═══"));
+        console.log(`Applied: ${applyResult.applied.length} files (${applyResult.applied.reduce((n, a) => n + a.opsApplied, 0)} ops)`);
+        console.log(`Skipped: ${applyResult.skipped.length}`);
+        console.log(`Skills created: ${applyResult.skillsCreated.length}, updated: ${applyResult.skillsUpdated.length}`);
+        if (applyResult.backupId) console.log(`Backup: ${applyResult.backupId}`);
+      }
     }
   });
 

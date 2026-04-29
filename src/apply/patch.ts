@@ -52,14 +52,18 @@ export function applyOps(original: string, ops: PatchOp[]): PatchResult {
       applied++;
     } else if (op.type === "append_to_section") {
       const idx = findSectionIndex(sections, op.heading);
+      const bullet = "- " + op.content;
       if (idx >= 0) {
-        sections[idx].content = (sections[idx].content ? sections[idx].content + "\n" : "") + "\n- " + op.content;
+        const trimmed = sections[idx].content.replace(/\n+$/, "");
+        sections[idx].content = trimmed === ""
+          ? "\n" + bullet + "\n"
+          : trimmed + "\n\n" + bullet + "\n";
         applied++;
       } else {
         sections.push({
           heading: op.heading,
           level: 2,
-          content: "\n- " + op.content,
+          content: "\n" + bullet + "\n",
           startLine: 0, endLine: 0,
         });
         applied++;

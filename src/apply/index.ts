@@ -5,6 +5,7 @@ import chalk from "chalk";
 import type { AnalysisOutput, ProjectAnalysis } from "../analyzer/index.js";
 import type { SkillRecommendation } from "../types.js";
 import { applyOps, patchToOps } from "./patch.js";
+import { ensureTrailingNewline } from "./parser.js";
 import { unifiedDiff } from "./diff.js";
 import { backupFile, createBackupSession, pruneOldBackups, writeManifest } from "./backup.js";
 import { CLAUDE_HOME, CLAUDE_SKILLS_GLOBAL } from "../utils/paths.js";
@@ -86,7 +87,7 @@ async function applyInstructions(analysis: ProjectAnalysis, sessionDir: string, 
   }
 
   mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, result.patched);
+  writeFileSync(target, ensureTrailingNewline(result.patched));
   return { file: target, opsApplied: result.opsApplied };
 }
 
@@ -128,7 +129,7 @@ async function applySkills(analysis: ProjectAnalysis, sessionDir: string, opts: 
       manifestFiles.push(backupFile(sessionDir, target, { originalPath: target, type: "skill", scope: rec.scope, projectName: analysis.project.name }));
     }
     mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, rec.content);
+    writeFileSync(target, ensureTrailingNewline(rec.content));
     if (exists) updated.push(target); else created.push(target);
   }
 

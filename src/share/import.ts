@@ -3,6 +3,7 @@ import inquirer from "inquirer";
 import chalk from "chalk";
 import type { AnalysisEngine } from "../engine/index.js";
 import { applyOps, type PatchOp } from "../apply/patch.js";
+import { ensureTrailingNewline } from "../apply/parser.js";
 import { unifiedDiff } from "../apply/diff.js";
 import { backupFile, createBackupSession, writeManifest } from "../apply/backup.js";
 import { CLAUDE_MD_GLOBAL, AGENTS_MD_GLOBAL, CLAUDE_SKILLS_GLOBAL } from "../utils/paths.js";
@@ -138,7 +139,7 @@ export async function importPack(packPath: string, opts: ImportOptions): Promise
       }));
     }
     mkdirSync(dirname(preview.target.path), { recursive: true });
-    writeFileSync(preview.target.path, result.patched);
+    writeFileSync(preview.target.path, ensureTrailingNewline(result.patched));
     ruleOpsApplied = result.opsApplied;
   }
 
@@ -148,13 +149,13 @@ export async function importPack(packPath: string, opts: ImportOptions): Promise
   for (const s of preview.newSkills) {
     const target = join(skillsDir, s.filename);
     mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, s.content);
+    writeFileSync(target, ensureTrailingNewline(s.content));
     skillsCreated++;
   }
   if (strategy === "replace" || strategy === "theirs") {
     for (const { skill, targetPath } of preview.existingSkills) {
       manifestFiles.push(backupFile(session.dir, targetPath, { originalPath: targetPath, type: "skill", scope: opts.project ? "project" : "global", projectName: opts.project?.name }));
-      writeFileSync(targetPath, skill.content);
+      writeFileSync(targetPath, ensureTrailingNewline(skill.content));
       skillsUpdated++;
     }
   }

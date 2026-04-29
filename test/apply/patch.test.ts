@@ -41,6 +41,24 @@ describe("apply ops", () => {
     expect(result.patched).toContain("Run vitest with coverage");
   });
 
+  it("appending preserves blank line before next heading (regression #3)", () => {
+    const original = "## Safety\n\n### File System\n- existing\n";
+    const result = applyOps(original, [
+      { type: "append_to_section", heading: "## Safety", content: "Verify backups" },
+    ]);
+    expect(result.opsApplied).toBe(1);
+    // The new bullet should not collide with the next heading
+    expect(result.patched).toMatch(/- Verify backups\n\n### File System/);
+  });
+
+  it("appending into empty section produces clean blank-line spacing", () => {
+    const original = "## Safety\n\n### Sub\n- item\n";
+    const result = applyOps(original, [
+      { type: "append_to_section", heading: "## Safety", content: "Rule one" },
+    ]);
+    expect(result.patched).toMatch(/## Safety\n\n- Rule one\n\n### Sub/);
+  });
+
   it("patchToOps maps additions/modifications/removals", () => {
     const patch: InstructionsPatch = {
       targetFile: "/x/CLAUDE.md",
