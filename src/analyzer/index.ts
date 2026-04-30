@@ -3,7 +3,7 @@ import type {
   SkillRecommendation, Source, UsageStats,
 } from "../types.js";
 import type { AnalysisEngine } from "../engine/index.js";
-import { maxTurnsForStrategy, prepareSessionData, summarizeAllSessions } from "./chunker.js";
+import { maxTurnsForStrategy, mergePatternResults, prepareSessionBatches, summarizeAllSessions } from "./chunker.js";
 import {
   SYSTEM_PROMPT, crossProjectPrompt, feedbackPrompt, instructionsPrompt, patternsPrompt, skillsPrompt,
 } from "./prompts.js";
@@ -105,7 +105,8 @@ function computeStats(projects: ExtractedProject[]): UsageStats {
 }
 
 export async function analyzePerProject(project: ExtractedProject, opts: AnalyzeOptions, label = ""): Promise<ProjectAnalysis> {
-  const { data: sessionData, strategy } = prepareSessionData(project);
+  const { batches, strategy } = prepareSessionBatches(project);
+  const sessionData = batches[0];
   const projectName = project.project.name;
   const source = project.project.source;
   const turnBudget = maxTurnsForStrategy(strategy);
@@ -115,8 +116,25 @@ export async function analyzePerProject(project: ExtractedProject, opts: Analyze
   let patterns: any = { patterns: [], sessionSummaries: [] };
   if (shouldRun(opts, "patterns")) {
     const t = Date.now();
-    patterns = await runJson(opts.engine, patternsPrompt(sessionData, projectName, source), opts.model, turnBudget);
-    log("patterns", Date.now() - t, `→ ${(patterns.patterns ?? []).length} patterns`);
+    if (batches.length === 1) {
+      patterns = await runJson(opts.engine, patternsPrompt(sessionData, projectName, source), opts.model, turnBudget);
+    } else {
+      const batchResults: any[] = [];
+      for (let i = 0; i < batches.length; i++) {
+        const bt = Date.now();
+        const result = await runJson<{ patterns: any[]; sessionSummaries: any[] }>(
+          opts.engine,
+          patternsPrompt(batches[i], `${projectName} (batch ${i + 1}/${batches.length})`, source),
+          opts.model,
+          turnBudget,
+        );
+        batchResults.push(result);
+        log(`patterns batch ${i + 1}/${batches.length}`, Date.now() - bt, `→ ${(result.patterns ?? []).length} patterns`);
+      }
+      patterns = mergePatternResults(batchResults);
+    }
+    const totalLabel = batches.length === 1 ? "patterns" : "patterns (merged)";
+    log(totalLabel, Date.now() - t, `→ ${(patterns.patterns ?? []).length} patterns`);
   }
 
   let instructionsPatch: InstructionsPatch | null = null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickStrategy, prepareSessionData } from "../../src/analyzer/chunker.js";
+import { mergePatternResults, pickStrategy, prepareSessionBatches, prepareSessionData } from "../../src/analyzer/chunker.js";
 import type { ExtractedProject, ExtractedSession } from "../../src/types.js";
 
 function makeSession(id: string): ExtractedSession {
@@ -68,5 +68,67 @@ describe("chunker", () => {
     const parsed = JSON.parse(json);
     expect(parsed[0].userPrompts).toBeTruthy();
     expect(parsed[0].messages).toBeUndefined();
+  });
+});
+
+describe("prepareSessionBatches", () => {
+  it("returns one batch when sessions ≤ batch size", () => {
+    const { batches } = prepareSessionBatches(makeProject(40), 100);
+    expect(batches).toHaveLength(1);
+  });
+  it("splits into N batches above threshold", () => {
+    const { batches } = prepareSessionBatches(makeProject(250), 100);
+    expect(batches).toHaveLength(3);
+    expect(JSON.parse(batches[0])).toHaveLength(100);
+    expect(JSON.parse(batches[2])).toHaveLength(50);
+  });
+  it("each batch is independently parseable JSON", () => {
+    const { batches } = prepareSessionBatches(makeProject(150), 50);
+    for (const b of batches) expect(() => JSON.parse(b)).not.toThrow();
+  });
+});
+
+describe("mergePatternResults", () => {
+  const make = (description: string, occ: number, sids: string[], confidence = "high") => ({
+    category: "tool_preference",
+    description,
+    occurrences: occ,
+    sessionIds: sids,
+    quotes: sids.map((id) => ({ sessionId: id, text: "x" })),
+    confidence,
+  });
+
+  it("dedupes by category + normalized description", () => {
+    const merged = mergePatternResults([
+      { patterns: [make("Always use msw for HTTP mocks", 5, ["a", "b"])] },
+      { patterns: [make("ALWAYS USE MSW FOR HTTP MOCKS", 3, ["b", "c"])] },
+    ]);
+    expect(merged.patterns).toHaveLength(1);
+    expect(merged.patterns[0].occurrences).toBe(8);
+    expect(merged.patterns[0].sessionIds.sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("upgrades confidence to the highest seen", () => {
+    const merged = mergePatternResults([
+      { patterns: [make("Run tsc before commit", 3, ["a"], "low")] },
+      { patterns: [make("Run tsc before commit", 5, ["b"], "high")] },
+    ]);
+    expect(merged.patterns[0].confidence).toBe("high");
+  });
+
+  it("keeps distinct patterns separate", () => {
+    const merged = mergePatternResults([
+      { patterns: [make("Use msw", 5, ["a"])] },
+      { patterns: [make("Use vitest", 5, ["b"])] },
+    ]);
+    expect(merged.patterns).toHaveLength(2);
+  });
+
+  it("concatenates session summaries across batches", () => {
+    const merged = mergePatternResults([
+      { sessionSummaries: [{ sessionId: "a", taskType: "test", outcome: "achieved" }] },
+      { sessionSummaries: [{ sessionId: "b", taskType: "feature", outcome: "achieved" }] },
+    ]);
+    expect(merged.sessionSummaries).toHaveLength(2);
   });
 });
