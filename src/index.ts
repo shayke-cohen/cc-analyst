@@ -10,6 +10,8 @@ import { analyze } from "./analyzer/index.js";
 import { apply } from "./apply/index.js";
 import { listBackups, restoreBackup } from "./apply/backup.js";
 import { exportPack } from "./share/export.js";
+import { renderCrossProject, renderFeedback, renderProjectReport, renderRunIndex, renderStats } from "./output/markdown.js";
+import { computeStats } from "./analyzer/index.js";
 import { importPack, previewImport } from "./share/import.js";
 import { readPack } from "./share/pack.js";
 import { listProjects as listProjectsForShare } from "./extractor/index.js";
@@ -132,14 +134,38 @@ program
     if (opts.output) {
       mkdirSync(opts.output, { recursive: true });
       writeFileSync(join(opts.output, "analysis.json"), JSON.stringify(output, null, 2));
+
       for (const r of output.reports) {
+        const projectAnalysis = output.perProject.find((p) => p.project.name === r.projectRef?.name);
+        if (!projectAnalysis) continue;
         const dir = join(opts.output, "projects", r.projectRef!.name);
         mkdirSync(dir, { recursive: true });
         writeFileSync(join(dir, "report.json"), JSON.stringify(r, null, 2));
+        writeFileSync(join(dir, "report.md"), renderProjectReport(r, projectAnalysis));
       }
-      if (output.feedback) writeFileSync(join(opts.output, "feedback.json"), JSON.stringify(output.feedback, null, 2));
-      if (output.crossProject) writeFileSync(join(opts.output, "cross-project.json"), JSON.stringify(output.crossProject, null, 2));
-      console.log(chalk.green(`Reports written to ${opts.output}`));
+
+      if (output.feedback) {
+        writeFileSync(join(opts.output, "feedback.json"), JSON.stringify(output.feedback, null, 2));
+        writeFileSync(join(opts.output, "feedback.md"), renderFeedback(output.feedback));
+      }
+      if (output.crossProject) {
+        writeFileSync(join(opts.output, "cross-project.json"), JSON.stringify(output.crossProject, null, 2));
+        writeFileSync(join(opts.output, "cross-project.md"), renderCrossProject(output.crossProject));
+      }
+
+      const stats = computeStats(projects);
+      writeFileSync(join(opts.output, "stats.md"), renderStats(stats));
+
+      writeFileSync(
+        join(opts.output, "README.md"),
+        renderRunIndex({
+          output, reports: output.reports,
+          generatedAt: new Date().toISOString(),
+          source, engine: engineName, outputDir: opts.output,
+        }),
+      );
+
+      console.log(chalk.green(`Reports written to ${opts.output} (open ${join(opts.output, "README.md")})`));
     } else {
       console.log(JSON.stringify(output, null, 2));
     }
