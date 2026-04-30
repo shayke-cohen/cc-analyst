@@ -3,7 +3,7 @@ import type {
   SkillRecommendation, Source, UsageStats,
 } from "../types.js";
 import type { AnalysisEngine } from "../engine/index.js";
-import { prepareSessionData, summarizeAllSessions } from "./chunker.js";
+import { maxTurnsForStrategy, prepareSessionData, summarizeAllSessions } from "./chunker.js";
 import {
   SYSTEM_PROMPT, crossProjectPrompt, feedbackPrompt, instructionsPrompt, patternsPrompt, skillsPrompt,
 } from "./prompts.js";
@@ -42,15 +42,15 @@ function stripFences(s: string): string {
   return t.trim();
 }
 
-async function runJson<T>(engine: AnalysisEngine, prompt: string, model?: string): Promise<T> {
-  const raw = await engine.run(prompt, { model, systemPrompt: SYSTEM_PROMPT });
+async function runJson<T>(engine: AnalysisEngine, prompt: string, model?: string, maxTurns?: number): Promise<T> {
+  const raw = await engine.run(prompt, { model, systemPrompt: SYSTEM_PROMPT, maxTurns });
   const cleaned = stripFences(raw);
   try {
     return JSON.parse(cleaned) as T;
   } catch (err) {
     const repaired = await engine.run(
       `Your previous response was not valid JSON. Return ONLY the JSON, no commentary, no fences.\n\nPrevious response:\n${cleaned}`,
-      { model, systemPrompt: SYSTEM_PROMPT },
+      { model, systemPrompt: SYSTEM_PROMPT, maxTurns },
     );
     return JSON.parse(stripFences(repaired)) as T;
   }
@@ -105,16 +105,17 @@ function computeStats(projects: ExtractedProject[]): UsageStats {
 }
 
 export async function analyzePerProject(project: ExtractedProject, opts: AnalyzeOptions, label = ""): Promise<ProjectAnalysis> {
-  const sessionData = prepareSessionData(project);
+  const { data: sessionData, strategy } = prepareSessionData(project);
   const projectName = project.project.name;
   const source = project.project.source;
+  const turnBudget = maxTurnsForStrategy(strategy);
   const log = (phase: string, ms: number, extra = "") =>
     console.error(`  ${label}${projectName} · ${phase}${extra ? " " + extra : ""}  (${(ms / 1000).toFixed(1)}s)`);
 
   let patterns: any = { patterns: [], sessionSummaries: [] };
   if (shouldRun(opts, "patterns")) {
     const t = Date.now();
-    patterns = await runJson(opts.engine, patternsPrompt(sessionData, projectName, source), opts.model);
+    patterns = await runJson(opts.engine, patternsPrompt(sessionData, projectName, source), opts.model, turnBudget);
     log("patterns", Date.now() - t, `→ ${(patterns.patterns ?? []).length} patterns`);
   }
 
@@ -134,6 +135,7 @@ export async function analyzePerProject(project: ExtractedProject, opts: Analyze
         "project",
       ),
       opts.model,
+      turnBudget,
     );
     instructionsPatch.targetFile = target.path;
     instructionsPatch.fileKind = target.kind;
@@ -156,6 +158,7 @@ export async function analyzePerProject(project: ExtractedProject, opts: Analyze
         "project",
       ),
       opts.model,
+      turnBudget,
     );
     skills = (result.skills ?? []).map((s) => normalizeSkill(s, project.project));
     log("skills", Date.now() - t, `→ ${skills.length} skills`);
@@ -172,6 +175,8 @@ export async function analyze(projects: ExtractedProject[], opts: AnalyzeOptions
   }
 
   const stats = computeStats(projects);
+  const totalSessions = projects.reduce((n, p) => n + p.sessions.length, 0);
+  const aggregateTurnBudget = totalSessions > 100 ? 8 : totalSessions > 30 ? 5 : 3;
   let feedback: FeedbackReport | undefined;
   if (shouldRun(opts, "feedback")) {
     const t = Date.now();
@@ -185,6 +190,7 @@ export async function analyze(projects: ExtractedProject[], opts: AnalyzeOptions
         projects.length === 1 ? `project "${projects[0].project.name}"` : "all projects",
       ),
       opts.model,
+      aggregateTurnBudget,
     );
     console.error(`  feedback (aggregate)  (${((Date.now() - t) / 1000).toFixed(1)}s)`);
   }
@@ -199,6 +205,7 @@ export async function analyze(projects: ExtractedProject[], opts: AnalyzeOptions
         "~/.claude/CLAUDE.md and ~/.codex/AGENTS.md",
       ),
       opts.model,
+      aggregateTurnBudget,
     );
     console.error(`  cross-project  (${((Date.now() - t) / 1000).toFixed(1)}s)`);
   }

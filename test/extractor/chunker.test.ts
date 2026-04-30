@@ -53,17 +53,17 @@ describe("chunker", () => {
     expect(pickStrategy(500)).toBe("summary");
   });
   it("full keeps message text", () => {
-    const json = prepareSessionData(makeProject(5));
+    const { data: json } = prepareSessionData(makeProject(5));
     expect(json).toContain("hello world");
   });
   it("hybrid trims assistant snippets to ~200 chars", () => {
-    const json = prepareSessionData(makeProject(20));
+    const { data: json } = prepareSessionData(makeProject(20));
     expect(json).toContain("hello world");
     const parsed = JSON.parse(json);
     expect(parsed[0].assistantSnippets[0].length).toBeLessThanOrEqual(200);
   });
   it("summary drops messages but keeps prompts", () => {
-    const json = prepareSessionData(makeProject(60));
+    const { data: json } = prepareSessionData(makeProject(60));
     expect(json).toContain("hello world");
     const parsed = JSON.parse(json);
     expect(parsed[0].userPrompts).toBeTruthy();

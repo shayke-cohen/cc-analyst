@@ -152,7 +152,14 @@ ${patternsJson}
 Computed stats:
 ${statsJson}
 
-Evaluate six dimensions:
+BEFORE coaching, screen the dataset:
+- Count sessions whose first user prompt is identical (or near-identical) to another session's first prompt.
+- If >60% of sessions share <=3 distinct first-prompt strings, this dataset is dominated by automated/synthetic traffic (smoke tests, canary probes, evaluation runs). In that case:
+  - State this prominently in workStyle as the FIRST sentence ("This dataset is dominated by automated/synthetic traffic — N of M sessions are identical probes; coaching is restricted to the organic subset.").
+  - Limit prescriptive coaching items (strengths/improvements/etc.) to the ORGANIC sessions only.
+  - Add ONE improvement item titled "Filter synthetic traffic before analysis" with concrete suggestion: "Re-run cc-analyst with --min-sessions to exclude probe-dominated runs, or tag canary prompts with a reserved prefix the analyzer can exclude."
+
+Evaluate six dimensions on the ORGANIC subset (or full set if no synthetic dominance):
 1. Prompting quality (first-prompt length, clarification rate)
 2. Tool usage (errors, diversity, tool-choice accuracy)
 3. Context management (turns/session, cache hit ratio)

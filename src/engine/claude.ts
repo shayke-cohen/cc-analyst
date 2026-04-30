@@ -9,6 +9,7 @@ export class ClaudeEngine implements AnalysisEngine {
 
   async run(prompt: string, opts: EngineRunOptions = {}): Promise<string> {
     const out: string[] = [];
+    let errorMessage: string | null = null;
 
     const iter = query({
       prompt,
@@ -30,8 +31,13 @@ export class ClaudeEngine implements AnalysisEngine {
           }
         }
       }
+      if (msg.type === "result" && (msg as any).is_error) {
+        errorMessage = (msg as any).result || (msg as any).error || "engine returned error result";
+      }
     }
 
-    return out.join("\n").trim();
+    const text = out.join("\n").trim();
+    if (errorMessage && !text) throw new Error(errorMessage);
+    return text;
   }
 }

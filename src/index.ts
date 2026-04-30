@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import type { Source, EngineName } from "./types.js";
@@ -102,6 +102,10 @@ program
   .option("--apply", "apply recommendations after analysis")
   .option("--auto", "auto-apply high-confidence (with --apply)")
   .option("--dry-run", "preview without writing (with --apply)")
+  .option("--project-exact", "match --project name exactly (otherwise substring)")
+  .option("--min-sessions <n>", "skip projects with fewer than N sessions", (v) => parseInt(v, 10))
+  .option("--top <n>", "analyze the N most-active projects", (v) => parseInt(v, 10))
+  .option("--force", "overwrite existing --output directory if non-empty")
   .option("-o, --output <dir>", "write reports to directory")
   .action(async (opts) => {
     const source = parseSource(opts.source);
@@ -111,17 +115,48 @@ program
       console.error(chalk.yellow(`Warning: --apply has nothing to do when --only ${opts.only} skips both the instructions and skills phases. Drop --only, or use --only instructions / --only skills.`));
     }
 
+    if (opts.output && existsSync(opts.output) && readdirSync(opts.output).length > 0 && !opts.force) {
+      console.error(chalk.red(`Output directory "${opts.output}" is non-empty. Re-running would overwrite analysis.json, feedback.{json,md}, cross-project.{json,md}, README.md, stats.md.`));
+      console.error(chalk.yellow(`Pass --force to overwrite, or pick a fresh directory.`));
+      process.exit(1);
+    }
+
     const filterTerms: string[] = opts.project ? String(opts.project).split(",").map((s: string) => s.trim()).filter(Boolean) : [];
     const result = extract({ source, days: opts.days });
     if (result.projects.length === 0) {
       console.error(chalk.yellow("No projects found matching filters."));
       process.exit(1);
     }
-    const projects = opts.all || filterTerms.length === 0
+    const matchProject = (p: { project: { name: string; decodedPath: string } }, term: string) =>
+      opts.projectExact ? p.project.name === term : (p.project.name.includes(term) || p.project.decodedPath.includes(term));
+    let projects = opts.all || filterTerms.length === 0
       ? result.projects
-      : result.projects.filter((p) => filterTerms.some((t) => p.project.name.includes(t) || p.project.decodedPath.includes(t)));
+      : result.projects.filter((p) => filterTerms.some((t) => matchProject(p, t)));
     if (projects.length === 0) {
       console.error(chalk.yellow(`No projects matched: ${filterTerms.join(", ")}`));
+      process.exit(1);
+    }
+
+    if (filterTerms.length > 0 && projects.length > 1 && !opts.projectExact) {
+      console.error(chalk.yellow(`Filter "${filterTerms.join(", ")}" matched ${projects.length} projects:`));
+      for (const p of projects) console.error(chalk.yellow(`  - ${p.project.name}\t${p.project.decodedPath}`));
+      console.error(chalk.yellow(`Pass --project-exact to require an exact name match.`));
+    }
+
+    if (typeof opts.minSessions === "number") {
+      const before = projects.length;
+      projects = projects.filter((p) => p.sessions.length >= opts.minSessions);
+      const dropped = before - projects.length;
+      if (dropped > 0) console.error(chalk.gray(`--min-sessions ${opts.minSessions}: skipped ${dropped} project(s)`));
+    }
+
+    if (typeof opts.top === "number" && opts.top > 0) {
+      projects = [...projects].sort((a, b) => b.sessions.length - a.sessions.length).slice(0, opts.top);
+      console.error(chalk.gray(`--top ${opts.top}: keeping ${projects.length} most-active project(s)`));
+    }
+
+    if (projects.length === 0) {
+      console.error(chalk.yellow("No projects remain after --min-sessions / --top filters."));
       process.exit(1);
     }
 

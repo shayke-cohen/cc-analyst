@@ -67,11 +67,19 @@ function compactSummary(s: ExtractedSession) {
   };
 }
 
-export function prepareSessionData(project: ExtractedProject): string {
-  const strat = pickStrategy(project.sessions.length);
-  if (strat === "full") return JSON.stringify(project.sessions.map(truncateToolOutputs));
-  if (strat === "hybrid") return JSON.stringify(project.sessions.map(hybridSummary));
-  return JSON.stringify(project.sessions.map(compactSummary));
+export function prepareSessionData(project: ExtractedProject): { data: string; strategy: ChunkStrategy } {
+  const strategy = pickStrategy(project.sessions.length);
+  let data: string;
+  if (strategy === "full") data = JSON.stringify(project.sessions.map(truncateToolOutputs));
+  else if (strategy === "hybrid") data = JSON.stringify(project.sessions.map(hybridSummary));
+  else data = JSON.stringify(project.sessions.map(compactSummary));
+  return { data, strategy };
+}
+
+export function maxTurnsForStrategy(strategy: ChunkStrategy): number {
+  if (strategy === "summary") return 8;
+  if (strategy === "hybrid") return 5;
+  return 3;
 }
 
 export function summarizeAllSessions(projects: ExtractedProject[]): string {
