@@ -45,7 +45,7 @@ npx tsx src/index.ts projects
 # 2. Extract sessions to JSON (no API calls — purely local)
 npx tsx src/index.ts extract --source all --output sessions.json
 
-# 3. Analyze one project, write reports
+# 3. Analyze one project, write reports — READ-ONLY, nothing is patched
 npx tsx src/index.ts analyze --project my-api --output ./out
 
 # 4. Preview the proposed CLAUDE.md / AGENTS.md edits
@@ -58,10 +58,32 @@ npx tsx src/index.ts analyze --project my-api --output ./out --apply
 npx tsx src/index.ts rollback
 ```
 
+> **Important:** `analyze` without `--apply` only writes reports to `--output`; it never modifies your `CLAUDE.md` / `AGENTS.md` / skill files. Patching only happens when you pass `--apply` (and `--apply --dry-run` previews the diff without writing).
+
 Use a different engine:
 
 ```bash
 npx tsx src/index.ts analyze --engine codex --project my-api --output ./out
+```
+
+### Output directory layout
+
+After `analyze --output ./out`, you get both JSON (machine-readable) and Markdown (human-readable) for every artefact:
+
+```text
+out/
+├── README.md              # run index — project table, links to all reports
+├── analysis.json          # full structured pipeline output
+├── feedback.json          # developer-coaching report (raw)
+├── feedback.md            # developer-coaching report (rendered)
+├── stats.md               # aggregate metrics: top tools, peak hours, error rate
+├── cross-project.json     # shared rules + divergences (only when ≥2 projects)
+├── cross-project.md
+└── projects/<name>/
+    ├── report.json        # patterns + suggested patch + skills (raw)
+    └── report.md          # rendered report with confidence/impact badges
+                           # 🟢🟡⚪ confidence, 🔴🟠⚪ impact,
+                           # quoted evidence + fenced unified diff of the patch
 ```
 
 ---
@@ -94,11 +116,21 @@ Apply mode shows a unified diff before writing. Backups go to `~/.cc-analyst/bac
 ```text
 sessions ─▶ Phase 1: patterns ─┬─▶ Phase 2: instructions patch (CLAUDE.md / AGENTS.md)
                                 ├─▶ Phase 3: skills (Claude Code only)
-                                └─▶ Phase 4: feedback
+                                └─▶ Phase 4: feedback (developer coaching)
 all reports ──────────────────────▶ Cross-project: shared rules + divergences
 ```
 
 Each phase is one engine call. Inputs are chunked by session count: full payload (≤20), hybrid (≤50), summary (>50).
+
+| Phase | Output | What it produces |
+| --- | --- | --- |
+| 1 — patterns | `projects/<name>/report.json` | Recurring behaviours, error patterns, workflows — each with quoted evidence, occurrence count, and confidence |
+| 2 — instructions | (in `report.json`) | A precise patch for `CLAUDE.md` / `AGENTS.md`: add / append / replace / remove ops, plus a unified diff |
+| 3 — skills | (in `report.json`) | Multi-step workflows worth codifying as skill files (Claude Code only) |
+| 4 — feedback | `feedback.json` + `feedback.md` | **Developer-coaching report** — work-style narrative, strengths, improvements, prompting patterns, tool-usage insights, quick wins. Six dimensions: prompting quality, tool usage, context management, iteration efficiency, session organization, error recovery |
+| Cross-project | `cross-project.json` + `cross-project.md` | Rules appearing in 3+ projects (promote to global), intentional divergences vs. inconsistencies, comparative efficiency notes |
+
+You can run a single phase with `--only <patterns|instructions|skills|feedback>` if you only want one slice.
 
 The system prompt enforces evidence standards:
 
